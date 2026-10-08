@@ -165,6 +165,7 @@ svg.months line{stroke:var(--line)}
   <button role="tab" data-tab="stats" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V11M12 20V5M19 20v-7"/></svg>통계</button>
 </nav>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 <script>
 (() => {
 const WORKS = ['유리막','프리미엄 유리막','썬팅','PPF','하이패스','가죽코팅','실내크리닝','블랙박스','크롬죽이기','광택'];
@@ -180,7 +181,7 @@ const dayLabel = ds => { const d=new Date(ds+'T00:00'); return `${d.getMonth()+1
 const now = new Date();
 const S = {
   tab: 'add', year: now.getFullYear(), month: now.getMonth()+1,
-  jobs: [], loaded: false, db: null, col: null, unsub: null,
+  jobs: [], loaded: false, sb: null, session: null, member: false, authMode: 'login',
   form: null, bookFilter: 'all', bookQuery: '', bookShop: '',
   openShop: null, dueSel: {}, confirm: null, statMonth: null,
 };
@@ -205,18 +206,32 @@ function freq(key, filter){
 function splitWork(w){ return (w||'').split(/[,/]/).map(s=>s.trim()).filter(Boolean); }
 function joinWork(f){ return [...f.works, ...(f.workExtra.trim()?[f.workExtra.trim()]:[])].join(', '); }
 
-function subscribe(){
-  if (!S.col) return;
-  S.unsub && S.unsub();
-  S.loaded = false; setSync('불러오는 중');
-  const q = S.col.where('date','>=',`${S.year}-01-01`).where('date','<',`${S.year+1}-01-01`).orderBy('date','desc').limit(1000);
-  S.unsub = q.onSnapshot(snap => {
-    S.jobs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-    S.loaded = true; setSync(snap.metadata.hasPendingWrites ? '저장 중' : `${S.year}년 ${S.jobs.length}건`);
-    // don't yank the keyboard away while someone is typing
-    if (document.activeElement?.matches('#main input, #main textarea, #main select')) { S.stale = true; return; }
-    render();
-  }, err => { setSync('연결 끊김'); showBanner('장부를 불러오지 못했어요. 페이지를 새로고침해 주세요.'); });
+// Supabase 'filmworks' 스키마 (다른 앱과 분리된 공간)
+const SB_URL = 'https://qtiazentdzwzkgrsjbob.supabase.co';
+const SB_KEY = 'sb_publishable_bKsdXn04F_MCXT9YgCiYZg_biJjPRZC';
+const fromRow = r => ({ id:r.id, date:r.date, shop:r.shop, dealer:r.dealer, car:r.car, vin:r.vin, work:r.work,
+  amount:r.amount, paid:r.paid, paidDate:r.paid_date||'', canceled:r.canceled, note:r.note, src:r.src });
+function fail(e, what){
+  console.error(e);
+  const msg = String(e?.message||'');
+  if (/schema must be one of|Invalid schema/i.test(msg)) showBanner('Supabase에서 filmworks 공간이 아직 열리지 않았어요. (Settings → API → Exposed schemas에 filmworks 추가)');
+  else if (/JWT|session|auth/i.test(msg)) { showBanner('로그인이 풀렸어요. 다시 로그인해 주세요.'); S.sb?.auth.signOut(); }
+  else toast(`${what} 못했어요. 다시 시도해 주세요.`);
+}
+
+async function load(){
+  if (!S.sb || !S.member) return;
+  setSync('불러오는 중');
+  const { data, error } = await S.sb.from('jobs').select('*')
+    .gte('date', `${S.year}-01-01`).lt('date', `${S.year+1}-01-01`)
+    .order('date', { ascending:false }).order('created_at', { ascending:false }).limit(5000);
+  if (error) { setSync('연결 끊김'); fail(error, '장부를 불러오지'); return; }
+  showBanner('');
+  S.jobs = data.map(fromRow);
+  S.loaded = true; setSync(`${S.year}년 ${S.jobs.length}건`);
+  // don't yank the keyboard away while someone is typing
+  if (document.activeElement?.matches('#main input, #main textarea, #main select')) { S.stale = true; return; }
+  render();
 }
 function setSync(t){ document.getElementById('syncState').textContent = t; }
 function showBanner(t){ document.getElementById('banner').innerHTML = t ? `<div class="banner" style="margin-top:12px">${esc(t)}</div>` : ''; }
@@ -224,24 +239,30 @@ function showBanner(t){ document.getElementById('banner').innerHTML = t ? `<div 
 async function saveJob(f){
   const data = { date:f.date, shop:f.shop.trim(), dealer:f.dealer.trim(), car:f.car.trim(), vin:f.vin.trim(),
     work: joinWork(f), amount: Number(String(f.amount).replace(/[^\d]/g,''))||0, paid: !!f.paid, canceled: !!f.canceled,
-    note: f.note.trim(), updatedAt: new Date().toISOString() };
+    note: f.note.trim() };
   if (f.id) {
     const old = S.jobs.find(j=>j.id===f.id) || {};
-    if (old.src) data.src = old.src;
-    if (data.paid) data.paidDate = old.paid ? (old.paidDate||todayStr()) : todayStr();
-    await S.col.doc(f.id).set(data);
+    data.paid_date = data.paid ? (old.paid ? (old.paidDate||todayStr()) : todayStr()) : null;
+    const { error } = await S.sb.from('jobs').update(data).eq('id', f.id);
+    if (error) throw error;
   } else {
-    data.createdAt = data.updatedAt; if (data.paid) data.paidDate = todayStr();
-    await S.col.doc().set(data);
+    data.paid_date = data.paid ? todayStr() : null;
+    const { error } = await S.sb.from('jobs').insert(data);
+    if (error) throw error;
   }
+  load();
   return data;
 }
+async function deleteJob(id){
+  const { error } = await S.sb.from('jobs').delete().eq('id', id);
+  if (error) throw error;
+  load();
+}
 async function setPaid(ids, paid){
-  const d = todayStr();
-  for (const id of ids) {
-    const upd = paid ? { paid:true, paidDate:d } : { paid:false, paidDate:'' };
-    try { await S.col.doc(id).update(upd); } catch(e){ toast('일부 건을 저장하지 못했어요. 다시 시도해 주세요.'); return false; }
-  }
+  const upd = paid ? { paid:true, paid_date:todayStr() } : { paid:false, paid_date:null };
+  const { error } = await S.sb.from('jobs').update(upd).in('id', ids);
+  if (error) { fail(error, '입금 처리를'); return false; }
+  await load();
   return true;
 }
 
@@ -341,7 +362,7 @@ function bindForm(root, f, mode, rerender, done){
       root.querySelector('#delConfirm').innerHTML = `<div class="confirm"><span>이 작업을 장부에서 지울까요? 되돌릴 수 없어요.</span><div class="btnrow"><button type="button" class="btn small sec" data-delno>그대로 두기</button><button type="button" class="btn small danger" data-delyes>지우기</button></div></div>`;
     }
     else if (b.hasAttribute('data-delno')) root.querySelector('#delConfirm').innerHTML='';
-    else if (b.hasAttribute('data-delyes')){ b.disabled=true; try{ await S.col.doc(f.id).delete(); toast('지웠어요'); done(); }catch(err){ toast('지우지 못했어요. 다시 시도해 주세요.'); b.disabled=false; } }
+    else if (b.hasAttribute('data-delyes')){ b.disabled=true; try{ await deleteJob(f.id); toast('지웠어요'); done(); }catch(err){ fail(err,'지우지'); b.disabled=false; } }
   };
   const amt = root.querySelector('#f_amount');
   amt.oninput = () => { const n = amt.value.replace(/[^\d]/g,''); amt.value = n ? won(Number(n)) : ''; };
@@ -349,7 +370,7 @@ function bindForm(root, f, mode, rerender, done){
   root.querySelector('#f_shop').onchange = () => { readForm(root,f); rerender(); };
   root.querySelector('#jobForm').onsubmit = async e => {
     e.preventDefault(); readForm(root,f);
-    if (!S.col) { toast('저장소에 연결되지 않았어요'); return; }
+    if (!S.member) { toast('로그인한 뒤에 저장할 수 있어요'); return; }
     if (!f.car.trim() && !joinWork(f)) { toast('차종이나 작업내용을 적어 주세요'); return; }
     const btn = root.querySelector('#f_save'); btn.disabled = true;
     try {
@@ -447,7 +468,26 @@ function viewStats(){
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px"><h2>${sm}월 작업장별</h2><span class="hint num">${js.length}대 · ${won(sum(js))}원</span></div>${bar(shopRows, o=>o.t, o=>`${man(o.t)} · ${o.n}대`)}</div>
     <div class="card"><h2 style="margin-bottom:12px">${sm}월 작업내용</h2>${bar(workRows, o=>o.n, o=>`${o.n}건`)}</div>
     <div class="card"><h2 style="margin-bottom:12px">${sm}월 딜러별</h2>${bar(dealerRows, o=>o.t, o=>`${man(o.t)} · ${o.n}대`)}</div>
+    <div class="btnrow"><span class="hint" style="align-self:center;flex:1">${esc(S.session?.user?.email||'')}</span><button type="button" class="btn small sec" data-logout>로그아웃</button></div>
   </section>`;
+}
+
+function viewLogin(){
+  if (!S.sb) return `<section class="view"><div class="list"><div class="empty">${S.bootError?esc(S.bootError):'불러오는 중이에요'}</div></div></section>`;
+  if (S.session && !S.member) return `<section class="view"><div class="card form">
+    <h2>이 계정은 장부를 볼 수 없어요</h2>
+    <p class="hint">${esc(S.session.user.email||'')} 계정은 필름웍스 장부에 등록되어 있지 않아요. 주인 계정으로 다시 로그인해 주세요.</p>
+    <button type="button" class="btn sec" data-logout>로그아웃</button></div></section>`;
+  const signup = S.authMode==='signup';
+  return `<section class="view"><form class="card form" id="loginForm" autocomplete="on">
+    <h2>${signup?'처음 쓰는 계정 만들기':'로그인'}</h2>
+    <div class="field"><label class="label" for="l_email">이메일</label><input type="text" inputmode="email" autocomplete="username" id="l_email" required></div>
+    <div class="field"><label class="label" for="l_pw">비밀번호</label><input type="password" autocomplete="${signup?'new-password':'current-password'}" id="l_pw" required minlength="6" style="width:100%;background:var(--sunk);border:1px solid transparent;border-radius:10px;padding:11px 12px;font-size:16px"></div>
+    ${signup?'<p class="hint">처음 만든 계정 하나만 장부 주인으로 등록돼요. 그 뒤로는 다른 계정이 들어와도 장부를 볼 수 없어요.</p>':''}
+    <div id="loginMsg"></div>
+    <button type="submit" class="btn" id="l_go">${signup?'계정 만들기':'로그인'}</button>
+    <button type="button" class="btn sec" data-authmode="${signup?'login':'signup'}">${signup?'이미 계정이 있어요':'처음이에요 (계정 만들기)'}</button>
+  </form></section>`;
 }
 
 // ---------- render ----------
@@ -455,6 +495,9 @@ function render(){
   S.stale = false;
   const main = document.getElementById('main');
   const y = window.scrollY;
+  const gated = !S.member;
+  document.querySelector('nav.tabs').hidden = gated;
+  if (gated) { document.getElementById('monthnav').hidden = true; main.innerHTML = viewLogin(); return; }
   document.getElementById('mLabel').textContent = `${S.year}년 ${S.month}월`;
   document.getElementById('monthnav').hidden = S.tab==='add';
   document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected', b.dataset.tab===S.tab));
@@ -487,10 +530,12 @@ function openEdit(id){
 
 // ---------- events ----------
 document.querySelector('nav.tabs').onclick = e => { const b=e.target.closest('button'); if(!b) return; S.tab=b.dataset.tab; S.confirm=null; try{localStorage.setItem('cn.tab',S.tab);}catch(err){} render(); window.scrollTo(0,0); };
-function shiftMonth(d){ let m=S.month+d, y=S.year; if(m<1){m=12;y--;} if(m>12){m=1;y++;} S.month=m; if(y!==S.year){ S.year=y; subscribe(); } render(); }
+function shiftMonth(d){ let m=S.month+d, y=S.year; if(m<1){m=12;y--;} if(m>12){m=1;y++;} S.month=m; if(y!==S.year){ S.year=y; S.jobs=[]; load(); } render(); }
 document.getElementById('mPrev').onclick = ()=>shiftMonth(-1);
 document.getElementById('mNext').onclick = ()=>shiftMonth(1);
 document.getElementById('main').addEventListener('click', async e => {
+  if (e.target.closest('[data-logout]')) { await S.sb.auth.signOut(); return; }
+  const am = e.target.closest('[data-authmode]'); if (am){ S.authMode = am.dataset.authmode; render(); return; }
   const ed = e.target.closest('[data-edit]'); if (ed){ openEdit(ed.dataset.edit); return; }
   const bf = e.target.closest('[data-bf]'); if (bf){ S.bookFilter = bf.dataset.bf; render(); return; }
   const sm = e.target.closest('[data-sm]'); if (sm){ S.month = Number(sm.dataset.sm); render(); return; }
@@ -508,6 +553,27 @@ document.getElementById('main').addEventListener('change', e => {
 document.getElementById('main').addEventListener('focusout', () => setTimeout(() => {
   if (S.stale && !document.activeElement?.matches('#main input, #main textarea, #main select')) render();
 }, 0));
+document.getElementById('main').addEventListener('submit', async e => {
+  if (e.target.id!=='loginForm') return;
+  e.preventDefault();
+  const email = document.getElementById('l_email').value.trim(), pw = document.getElementById('l_pw').value;
+  const msg = t => { document.getElementById('loginMsg').innerHTML = t ? `<p class="hint warn">${esc(t)}</p>` : ''; };
+  const btn = document.getElementById('l_go'); btn.disabled = true; msg('');
+  try {
+    if (S.authMode==='signup') {
+      const { data, error } = await S.sb.auth.signUp({ email, password: pw, options: { emailRedirectTo: location.origin } });
+      if (error) throw error;
+      if (!data.session) { msg('메일함에서 인증 링크를 누른 뒤, 여기로 돌아와 로그인해 주세요.'); S.authMode='login'; btn.disabled=false; return; }
+    } else {
+      const { error } = await S.sb.auth.signInWithPassword({ email, password: pw });
+      if (error) throw error;
+    }
+  } catch(err) {
+    const m = String(err?.message||'');
+    msg(/Invalid login/i.test(m) ? '이메일이나 비밀번호가 맞지 않아요.' : /registered/i.test(m) ? '이미 있는 계정이에요. 로그인해 주세요.' : /Email not confirmed/i.test(m) ? '메일 인증이 아직이에요. 메일함의 인증 링크를 먼저 눌러 주세요.' : /Password/i.test(m) ? '비밀번호는 6자 이상으로 해 주세요.' : '로그인하지 못했어요: '+m);
+    btn.disabled = false;
+  }
+});
 let qT; document.getElementById('main').addEventListener('input', e => {
   if (e.target.id==='bq'){ S.bookQuery=e.target.value; clearTimeout(qT); qT=setTimeout(()=>{ render(); const i=document.getElementById('bq'); i.focus(); i.setSelectionRange(i.value.length,i.value.length); },250); }
 });
@@ -515,8 +581,6 @@ let qT; document.getElementById('main').addEventListener('input', e => {
 // ---------- export ----------
 function loadXLSX(){ return window.XLSX ? Promise.resolve() : new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
 async function exportXlsx(){
-  const dl = window.claude ? await claude.use('downloads') : null;
-  if (!dl) { toast('이 화면에서는 파일을 저장할 수 없어요'); return; }
   try { await loadXLSX(); } catch(e){ toast('엑셀 도구를 불러오지 못했어요'); return; }
   const head = ['작업일','입금','작업장','담당 딜러','차종','차대번호','작업내용','금액','메모'];
   const toRow = j => [j.date, j.canceled?'취소':(j.paid?'○':''), j.shop, j.dealer, j.car, j.vin, j.work, j.canceled?0:j.amount, j.note];
@@ -531,16 +595,33 @@ async function exportXlsx(){
   const due = S.jobs.filter(j=>!j.paid&&!j.canceled).sort((a,b)=>(a.shop||'').localeCompare(b.shop||'')||a.date.localeCompare(b.date));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([head, ...due.map(toRow), [], ['합계','','','','','','',sum(due)]]), '미입금');
   const buf = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-  try { await dl.save({ filename:`필름웍스_${S.year}.xlsx`, data: new Uint8Array(buf) }); toast('엑셀 파일을 저장했어요'); }
-  catch(e){ if (e?.code!=='declined') toast('파일을 저장하지 못했어요'); }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  a.download = `필름웍스_${S.year}.xlsx`; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast('엑셀 파일을 저장했어요');
 }
 
 // ---------- boot ----------
 render();
 (async () => {
-  const db = window.claude ? await claude.use('db') : null;
-  if (!db) { setSync('저장소 없음'); showBanner('이 화면에서는 장부 저장소를 열 수 없어요. claude.ai에 로그인한 상태로 열어 주세요.'); S.loaded=true; render(); return; }
-  S.db = db; S.col = db.collection('jobs'); subscribe();
+  if (!window.supabase) { S.bootError = '저장소 도구를 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.'; setSync('연결 끊김'); render(); return; }
+  S.sb = supabase.createClient(SB_URL, SB_KEY, { db: { schema: 'filmworks' } });
+  const onSession = async session => {
+    S.session = session;
+    if (!session) { S.member = false; S.jobs = []; S.loaded = false; setSync('로그인 필요'); render(); return; }
+    setSync('확인 중');
+    const { data, error } = await S.sb.rpc('claim_owner');
+    if (error) { S.member = false; fail(error, '계정을 확인하지'); render(); return; }
+    S.member = !!data;
+    render();
+    if (S.member) load();
+  };
+  S.sb.auth.onAuthStateChange((ev, session) => {
+    if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT' || ev === 'INITIAL_SESSION') setTimeout(() => onSession(session), 0);
+    else S.session = session;
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && S.member) load(); });
 })();
 })();
 </script>

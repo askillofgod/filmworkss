@@ -7,7 +7,7 @@
   --bg:#EDF1F3; --surface:#FFFFFF; --sunk:#E3E9EC; --ink:#15212A; --muted:#5B6A74; --line:#D3DBE0;
   --accent:#1D6FE0; --accent-ink:#FFFFFF; --accent-soft:#DCE9FB;
   --head-bg:linear-gradient(135deg,#1C1F23 0%,#0D0F11 100%); --head-ink:#FFFFFF; --head-muted:rgba(255,255,255,.68); --head-chip:rgba(255,255,255,.12); --head-line:rgba(255,255,255,.18);
-  --due:#A95F0A; --due-soft:#F7E9D4; --ok:#2B7A4B; --ok-soft:#DFF0E5; --bad:#B23A36; --bad-soft:#F6E0DE;
+  --due:#1D6FE0; --due-soft:#DCE9FB; --ok:#2B7A4B; --ok-soft:#DFF0E5; --bad:#B23A36; --bad-soft:#F6E0DE;
   --shadow:0 1px 2px rgba(21,33,42,.06),0 6px 20px rgba(21,33,42,.06);
   --sans:"IBM Plex Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -18,7 +18,7 @@
   --bg:#0E151A; --surface:#162027; --sunk:#1C2831; --ink:#E4EBEF; --muted:#8E9EA9; --line:#26343D;
   --accent:#6AA8FF; --accent-ink:#0B1424; --accent-soft:#16294A;
   --head-bg:linear-gradient(135deg,#16191C 0%,#08090A 100%); --head-ink:#E9F2F8; --head-muted:rgba(233,242,248,.62); --head-chip:rgba(255,255,255,.08); --head-line:rgba(255,255,255,.12);
-  --due:#E6A452; --due-soft:#3A2A16; --ok:#6CC592; --ok-soft:#163022; --bad:#EE8A84; --bad-soft:#3A1D1C;
+  --due:#6AA8FF; --due-soft:#16294A; --ok:#6CC592; --ok-soft:#163022; --bad:#EE8A84; --bad-soft:#3A1D1C;
   --shadow:0 1px 2px rgba(0,0,0,.3);
 }}
 :root[data-theme="dark"]{
@@ -26,7 +26,7 @@
   --bg:#0E151A; --surface:#162027; --sunk:#1C2831; --ink:#E4EBEF; --muted:#8E9EA9; --line:#26343D;
   --accent:#6AA8FF; --accent-ink:#0B1424; --accent-soft:#16294A;
   --head-bg:linear-gradient(135deg,#16191C 0%,#08090A 100%); --head-ink:#E9F2F8; --head-muted:rgba(233,242,248,.62); --head-chip:rgba(255,255,255,.08); --head-line:rgba(255,255,255,.12);
-  --due:#E6A452; --due-soft:#3A2A16; --ok:#6CC592; --ok-soft:#163022; --bad:#EE8A84; --bad-soft:#3A1D1C;
+  --due:#6AA8FF; --due-soft:#16294A; --ok:#6CC592; --ok-soft:#163022; --bad:#EE8A84; --bad-soft:#3A1D1C;
   --shadow:0 1px 2px rgba(0,0,0,.3);
 }
 *{box-sizing:border-box}
@@ -49,7 +49,7 @@ nav.tabs button{position:relative;border:0;background:none;padding:10px 0 12px;d
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-selected="true"]{color:var(--head-ink)}
 nav.tabs button[aria-selected="true"]::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--head-ink)}
-nav.tabs .badge{font-family:var(--mono);font-size:10px;background:#E6A452;color:#1A1206;border-radius:8px;padding:0 5px;margin-left:2px}
+nav.tabs .badge{font-family:var(--mono);font-size:10px;background:#2F7BFF;color:#FFFFFF;border-radius:8px;padding:0 5px;margin-left:2px}
 
 section.view{display:flex;flex-direction:column;gap:14px;padding-top:14px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
@@ -144,6 +144,15 @@ svg.months line{stroke:var(--line)}
 .sheet .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .x{border:0;background:var(--sunk);width:34px;height:34px;border-radius:50%;font-size:18px}
 
+/* entry screen (확인 없이 들어가는 임시 로그인 화면) */
+.entry{min-height:calc(100vh - 40px);display:flex;flex-direction:column;justify-content:center;gap:28px;padding-block:32px}
+.entry .brand{display:flex;flex-direction:column;align-items:center;gap:6px}
+.entry .brand b{font-family:var(--logo);font-size:34px;font-weight:700;letter-spacing:-.5px}
+.entry .brand span{font-family:var(--mono);font-size:12px;letter-spacing:4px;color:var(--muted)}
+.entry form{width:100%;max-width:360px;margin-inline:auto}
+.entry input[type=password]{width:100%;background:var(--sunk);border:1px solid transparent;border-radius:10px;padding:11px 12px;font-size:16px}
+.entry .btn{width:100%}
+body.entry-on header.top, body.entry-on nav.tabs{display:none}
 .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;z-index:30;max-width:calc(100% - 32px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .banner{background:var(--due-soft);color:var(--due);border-radius:12px;padding:12px 14px;font-size:14px}
 @media (prefers-reduced-motion:no-preference){.toast{animation:up .2s ease-out}@keyframes up{from{opacity:0;transform:translate(-50%,8px)}}}
@@ -190,6 +199,7 @@ const S = {
   openShop: null, dueSel: {}, confirm: null, statMonth: null,
 };
 try { const t = localStorage.getItem('cn.tab'); if (t) S.tab = t; } catch(e){}
+try { S.entered = sessionStorage.getItem('fw.entered') === '1'; } catch(e){}
 
 function blankForm(keep){
   return { id:null, date: keep?.date || todayStr(), shop: keep?.shop||'', dealer: keep?.dealer||'', car:'', vin:'',
@@ -474,11 +484,24 @@ function viewStats(){
   </section>`;
 }
 
+function viewEntry(){
+  return `<section class="entry">
+    <div class="brand"><b>필름웍스</b><span>FILMWORKS</span></div>
+    <form class="card form" id="entryForm" autocomplete="on">
+      <div class="field"><label class="label" for="e_id">아이디</label><input type="text" id="e_id" autocomplete="username"></div>
+      <div class="field"><label class="label" for="e_pw">비밀번호</label><input type="password" id="e_pw" autocomplete="current-password"></div>
+      <button type="submit" class="btn">로그인</button>
+    </form>
+  </section>`;
+}
+
 // ---------- render ----------
 function render(){
   S.stale = false;
   const main = document.getElementById('main');
   const y = window.scrollY;
+  document.body.classList.toggle('entry-on', !S.entered);
+  if (!S.entered) { main.innerHTML = viewEntry(); return; }
   if (!S.sb) { document.getElementById('monthnav').hidden = true; main.innerHTML = `<section class="view"><div class="list"><div class="empty">${S.bootError?esc(S.bootError):'불러오는 중이에요'}</div></div></section>`; return; }
   document.getElementById('mLabel').textContent = `${S.year}년 ${S.month}월`;
   document.getElementById('monthnav').hidden = S.tab==='add';
@@ -515,6 +538,14 @@ document.querySelector('nav.tabs').onclick = e => { const b=e.target.closest('bu
 function shiftMonth(d){ let m=S.month+d, y=S.year; if(m<1){m=12;y--;} if(m>12){m=1;y++;} S.month=m; if(y!==S.year){ S.year=y; S.jobs=[]; load(); } render(); }
 document.getElementById('mPrev').onclick = ()=>shiftMonth(-1);
 document.getElementById('mNext').onclick = ()=>shiftMonth(1);
+// 지금은 아이디·비밀번호를 확인하지 않고 바로 들어감. 진짜 로그인은 나중에 Supabase Auth로.
+document.getElementById('main').addEventListener('submit', e => {
+  if (e.target.id !== 'entryForm') return;
+  e.preventDefault();
+  S.entered = true;
+  try { sessionStorage.setItem('fw.entered', '1'); } catch(err){}
+  render(); window.scrollTo(0,0);
+});
 document.getElementById('main').addEventListener('click', async e => {
   const ed = e.target.closest('[data-edit]'); if (ed){ openEdit(ed.dataset.edit); return; }
   const bf = e.target.closest('[data-bf]'); if (bf){ S.bookFilter = bf.dataset.bf; render(); return; }

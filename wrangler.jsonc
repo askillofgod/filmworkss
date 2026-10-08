@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "filmworks",
+  "compatibility_date": "2026-10-01",
+  // 정적 페이지만 올림 (index.html). 서버 코드 없음.
+  "assets": {
+    "directory": "."
+  },
+  "workers_dev": true
+}

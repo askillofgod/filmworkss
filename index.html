@@ -4,9 +4,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <style>
 :root{
-  --bg:#EDF1F3; --surface:#FFFFFF; --sunk:#E3E9EC; --ink:#15212A; --muted:#5B6A74; --line:#D3DBE0;
+  --bg:#EDF1F3; --surface:#FFFFFF; --sunk:#E3E9EC; --ink:#0B1218; --muted:#3A4650; --line:#D3DBE0;
   --accent:#1D6FE0; --accent-ink:#FFFFFF; --accent-soft:#DCE9FB; --bar:#1D6FE0; --bar-sel:#0B3F8F;
-  --head-bg:linear-gradient(135deg,#1C1F23 0%,#0D0F11 100%); --head-ink:#FFFFFF; --head-muted:rgba(255,255,255,.68); --head-chip:rgba(255,255,255,.12); --head-line:rgba(255,255,255,.18);
+  --head-bg:linear-gradient(135deg,#0D47D9 0%,#0730A3 100%); --head-ink:#FFFFFF; --head-muted:rgba(255,255,255,.9); --head-chip:rgba(255,255,255,.12); --head-line:rgba(255,255,255,.18);
   --due:#1D6FE0; --due-soft:#DCE9FB; --ok:#2B7A4B; --ok-soft:#DFF0E5; --bad:#B23A36; --bad-soft:#F6E0DE;
   --shadow:0 1px 2px rgba(21,33,42,.06),0 6px 20px rgba(21,33,42,.06);
   --sans:"IBM Plex Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
@@ -15,17 +15,17 @@
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   color-scheme:dark;
-  --bg:#0E151A; --surface:#162027; --sunk:#1C2831; --ink:#E4EBEF; --muted:#8E9EA9; --line:#26343D;
+  --bg:#0E151A; --surface:#162027; --sunk:#1C2831; --ink:#F2F6F8; --muted:#B4C1CA; --line:#26343D;
   --accent:#6AA8FF; --accent-ink:#0B1424; --accent-soft:#16294A; --bar:#2F6FE4; --bar-sel:#7DB0FF;
-  --head-bg:linear-gradient(135deg,#16191C 0%,#08090A 100%); --head-ink:#E9F2F8; --head-muted:rgba(233,242,248,.62); --head-chip:rgba(255,255,255,.08); --head-line:rgba(255,255,255,.12);
+  --head-bg:linear-gradient(135deg,#0B379F 0%,#06226B 100%); --head-ink:#E9F2F8; --head-muted:rgba(233,242,248,.85); --head-chip:rgba(255,255,255,.08); --head-line:rgba(255,255,255,.12);
   --due:#6AA8FF; --due-soft:#16294A; --ok:#6CC592; --ok-soft:#163022; --bad:#EE8A84; --bad-soft:#3A1D1C;
   --shadow:0 1px 2px rgba(0,0,0,.3);
 }}
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --bg:#0E151A; --surface:#162027; --sunk:#1C2831; --ink:#E4EBEF; --muted:#8E9EA9; --line:#26343D;
+  --bg:#0E151A; --surface:#162027; --sunk:#1C2831; --ink:#F2F6F8; --muted:#B4C1CA; --line:#26343D;
   --accent:#6AA8FF; --accent-ink:#0B1424; --accent-soft:#16294A; --bar:#2F6FE4; --bar-sel:#7DB0FF;
-  --head-bg:linear-gradient(135deg,#16191C 0%,#08090A 100%); --head-ink:#E9F2F8; --head-muted:rgba(233,242,248,.62); --head-chip:rgba(255,255,255,.08); --head-line:rgba(255,255,255,.12);
+  --head-bg:linear-gradient(135deg,#0B379F 0%,#06226B 100%); --head-ink:#E9F2F8; --head-muted:rgba(233,242,248,.85); --head-chip:rgba(255,255,255,.08); --head-line:rgba(255,255,255,.12);
   --due:#6AA8FF; --due-soft:#16294A; --ok:#6CC592; --ok-soft:#163022; --bad:#EE8A84; --bad-soft:#3A1D1C;
   --shadow:0 1px 2px rgba(0,0,0,.3);
 }
@@ -45,11 +45,11 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .monthnav span{font-weight:600;font-size:14px;min-width:92px;text-align:center}
 
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--head-bg);box-shadow:0 -2px 10px rgba(10,30,45,.18);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom,0px)}
-nav.tabs button{position:relative;border:0;background:none;padding:10px 0 12px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;font-weight:600;color:var(--head-muted)}
+nav.tabs button{position:relative;border:0;background:none;padding:10px 0 12px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;font-weight:700;color:var(--head-muted)}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-selected="true"]{color:var(--head-ink)}
 nav.tabs button[aria-selected="true"]::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--head-ink)}
-nav.tabs .badge{font-family:var(--mono);font-size:10px;background:#2F7BFF;color:#FFFFFF;border-radius:8px;padding:0 5px;margin-left:2px}
+nav.tabs .badge{font-family:var(--mono);font-size:10px;background:#FFFFFF;color:#0730A3;border-radius:8px;padding:0 5px;margin-left:2px}
 
 section.view{display:flex;flex-direction:column;gap:14px;padding-top:14px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}

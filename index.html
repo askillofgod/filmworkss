@@ -181,7 +181,7 @@ const dayLabel = ds => { const d=new Date(ds+'T00:00'); return `${d.getMonth()+1
 const now = new Date();
 const S = {
   tab: 'add', year: now.getFullYear(), month: now.getMonth()+1,
-  jobs: [], loaded: false, sb: null, session: null, member: false, authMode: 'login',
+  jobs: [], loaded: false, sb: null,
   form: null, bookFilter: 'all', bookQuery: '', bookShop: '',
   openShop: null, dueSel: {}, confirm: null, statMonth: null,
 };
@@ -215,12 +215,11 @@ function fail(e, what){
   console.error(e);
   const msg = String(e?.message||'');
   if (/schema must be one of|Invalid schema/i.test(msg)) showBanner('Supabase에서 filmworks 공간이 아직 열리지 않았어요. (Settings → API → Exposed schemas에 filmworks 추가)');
-  else if (/JWT|session|auth/i.test(msg)) { showBanner('로그인이 풀렸어요. 다시 로그인해 주세요.'); S.sb?.auth.signOut(); }
   else toast(`${what} 못했어요. 다시 시도해 주세요.`);
 }
 
 async function load(){
-  if (!S.sb || !S.member) return;
+  if (!S.sb) return;
   setSync('불러오는 중');
   const { data, error } = await S.sb.from('jobs').select('*')
     .gte('date', `${S.year}-01-01`).lt('date', `${S.year+1}-01-01`)
@@ -370,7 +369,7 @@ function bindForm(root, f, mode, rerender, done){
   root.querySelector('#f_shop').onchange = () => { readForm(root,f); rerender(); };
   root.querySelector('#jobForm').onsubmit = async e => {
     e.preventDefault(); readForm(root,f);
-    if (!S.member) { toast('로그인한 뒤에 저장할 수 있어요'); return; }
+    if (!S.sb) { toast('저장소에 연결되지 않았어요'); return; }
     if (!f.car.trim() && !joinWork(f)) { toast('차종이나 작업내용을 적어 주세요'); return; }
     const btn = root.querySelector('#f_save'); btn.disabled = true;
     try {
@@ -468,26 +467,7 @@ function viewStats(){
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px"><h2>${sm}월 작업장별</h2><span class="hint num">${js.length}대 · ${won(sum(js))}원</span></div>${bar(shopRows, o=>o.t, o=>`${man(o.t)} · ${o.n}대`)}</div>
     <div class="card"><h2 style="margin-bottom:12px">${sm}월 작업내용</h2>${bar(workRows, o=>o.n, o=>`${o.n}건`)}</div>
     <div class="card"><h2 style="margin-bottom:12px">${sm}월 딜러별</h2>${bar(dealerRows, o=>o.t, o=>`${man(o.t)} · ${o.n}대`)}</div>
-    <div class="btnrow"><span class="hint" style="align-self:center;flex:1">${esc(S.session?.user?.email||'')}</span><button type="button" class="btn small sec" data-logout>로그아웃</button></div>
   </section>`;
-}
-
-function viewLogin(){
-  if (!S.sb) return `<section class="view"><div class="list"><div class="empty">${S.bootError?esc(S.bootError):'불러오는 중이에요'}</div></div></section>`;
-  if (S.session && !S.member) return `<section class="view"><div class="card form">
-    <h2>이 계정은 장부를 볼 수 없어요</h2>
-    <p class="hint">${esc(S.session.user.email||'')} 계정은 필름웍스 장부에 등록되어 있지 않아요. 주인 계정으로 다시 로그인해 주세요.</p>
-    <button type="button" class="btn sec" data-logout>로그아웃</button></div></section>`;
-  const signup = S.authMode==='signup';
-  return `<section class="view"><form class="card form" id="loginForm" autocomplete="on">
-    <h2>${signup?'처음 쓰는 계정 만들기':'로그인'}</h2>
-    <div class="field"><label class="label" for="l_email">이메일</label><input type="text" inputmode="email" autocomplete="username" id="l_email" required></div>
-    <div class="field"><label class="label" for="l_pw">비밀번호</label><input type="password" autocomplete="${signup?'new-password':'current-password'}" id="l_pw" required minlength="6" style="width:100%;background:var(--sunk);border:1px solid transparent;border-radius:10px;padding:11px 12px;font-size:16px"></div>
-    ${signup?'<p class="hint">처음 만든 계정 하나만 장부 주인으로 등록돼요. 그 뒤로는 다른 계정이 들어와도 장부를 볼 수 없어요.</p>':''}
-    <div id="loginMsg"></div>
-    <button type="submit" class="btn" id="l_go">${signup?'계정 만들기':'로그인'}</button>
-    <button type="button" class="btn sec" data-authmode="${signup?'login':'signup'}">${signup?'이미 계정이 있어요':'처음이에요 (계정 만들기)'}</button>
-  </form></section>`;
 }
 
 // ---------- render ----------
@@ -495,9 +475,7 @@ function render(){
   S.stale = false;
   const main = document.getElementById('main');
   const y = window.scrollY;
-  const gated = !S.member;
-  document.querySelector('nav.tabs').hidden = gated;
-  if (gated) { document.getElementById('monthnav').hidden = true; main.innerHTML = viewLogin(); return; }
+  if (!S.sb) { document.getElementById('monthnav').hidden = true; main.innerHTML = `<section class="view"><div class="list"><div class="empty">${S.bootError?esc(S.bootError):'불러오는 중이에요'}</div></div></section>`; return; }
   document.getElementById('mLabel').textContent = `${S.year}년 ${S.month}월`;
   document.getElementById('monthnav').hidden = S.tab==='add';
   document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected', b.dataset.tab===S.tab));
@@ -534,8 +512,6 @@ function shiftMonth(d){ let m=S.month+d, y=S.year; if(m<1){m=12;y--;} if(m>12){m
 document.getElementById('mPrev').onclick = ()=>shiftMonth(-1);
 document.getElementById('mNext').onclick = ()=>shiftMonth(1);
 document.getElementById('main').addEventListener('click', async e => {
-  if (e.target.closest('[data-logout]')) { await S.sb.auth.signOut(); return; }
-  const am = e.target.closest('[data-authmode]'); if (am){ S.authMode = am.dataset.authmode; render(); return; }
   const ed = e.target.closest('[data-edit]'); if (ed){ openEdit(ed.dataset.edit); return; }
   const bf = e.target.closest('[data-bf]'); if (bf){ S.bookFilter = bf.dataset.bf; render(); return; }
   const sm = e.target.closest('[data-sm]'); if (sm){ S.month = Number(sm.dataset.sm); render(); return; }
@@ -553,27 +529,6 @@ document.getElementById('main').addEventListener('change', e => {
 document.getElementById('main').addEventListener('focusout', () => setTimeout(() => {
   if (S.stale && !document.activeElement?.matches('#main input, #main textarea, #main select')) render();
 }, 0));
-document.getElementById('main').addEventListener('submit', async e => {
-  if (e.target.id!=='loginForm') return;
-  e.preventDefault();
-  const email = document.getElementById('l_email').value.trim(), pw = document.getElementById('l_pw').value;
-  const msg = t => { document.getElementById('loginMsg').innerHTML = t ? `<p class="hint warn">${esc(t)}</p>` : ''; };
-  const btn = document.getElementById('l_go'); btn.disabled = true; msg('');
-  try {
-    if (S.authMode==='signup') {
-      const { data, error } = await S.sb.auth.signUp({ email, password: pw, options: { emailRedirectTo: location.origin } });
-      if (error) throw error;
-      if (!data.session) { msg('메일함에서 인증 링크를 누른 뒤, 여기로 돌아와 로그인해 주세요.'); S.authMode='login'; btn.disabled=false; return; }
-    } else {
-      const { error } = await S.sb.auth.signInWithPassword({ email, password: pw });
-      if (error) throw error;
-    }
-  } catch(err) {
-    const m = String(err?.message||'');
-    msg(/Invalid login/i.test(m) ? '이메일이나 비밀번호가 맞지 않아요.' : /registered/i.test(m) ? '이미 있는 계정이에요. 로그인해 주세요.' : /Email not confirmed/i.test(m) ? '메일 인증이 아직이에요. 메일함의 인증 링크를 먼저 눌러 주세요.' : /Password/i.test(m) ? '비밀번호는 6자 이상으로 해 주세요.' : '로그인하지 못했어요: '+m);
-    btn.disabled = false;
-  }
-});
 let qT; document.getElementById('main').addEventListener('input', e => {
   if (e.target.id==='bq'){ S.bookQuery=e.target.value; clearTimeout(qT); qT=setTimeout(()=>{ render(); const i=document.getElementById('bq'); i.focus(); i.setSelectionRange(i.value.length,i.value.length); },250); }
 });
@@ -607,21 +562,9 @@ render();
 (async () => {
   if (!window.supabase) { S.bootError = '저장소 도구를 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.'; setSync('연결 끊김'); render(); return; }
   S.sb = supabase.createClient(SB_URL, SB_KEY, { db: { schema: 'filmworks' } });
-  const onSession = async session => {
-    S.session = session;
-    if (!session) { S.member = false; S.jobs = []; S.loaded = false; setSync('로그인 필요'); render(); return; }
-    setSync('확인 중');
-    const { data, error } = await S.sb.rpc('claim_owner');
-    if (error) { S.member = false; fail(error, '계정을 확인하지'); render(); return; }
-    S.member = !!data;
-    render();
-    if (S.member) load();
-  };
-  S.sb.auth.onAuthStateChange((ev, session) => {
-    if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT' || ev === 'INITIAL_SESSION') setTimeout(() => onSession(session), 0);
-    else S.session = session;
-  });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && S.member) load(); });
+  render();
+  load();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 })();
 })();
 </script>
